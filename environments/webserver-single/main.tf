@@ -1,5 +1,4 @@
-# environments/webserver-single/main.tf
-# Deploy de uma única EC2 com WebServer Apache
+# main.tf - Deploy de uma única EC2 com WebServer Apache (Simplificado)
 
 terraform {
   required_version = ">= 1.0"
@@ -10,15 +9,6 @@ terraform {
       version = "~> 5.0"
     }
   }
-
-  # Backend S3 (descomentar para uso em produção)
-  # backend "s3" {
-  #   bucket         = "terraform-state-bucket"
-  #   key            = "webserver-single/terraform.tfstate"
-  #   region         = "us-east-1"
-  #   encrypt        = true
-  #   dynamodb_table = "terraform-locks"
-  # }
 }
 
 provider "aws" {
@@ -34,7 +24,40 @@ provider "aws" {
   }
 }
 
-# Usa VPC default para simplicidade
+# Variáveis
+variable "aws_region" {
+  default = "us-east-1"
+}
+
+variable "environment" {
+  default = "demo"
+}
+
+variable "instance_type" {
+  default = "t3.micro"
+}
+
+variable "server_message" {
+  default = "Deploy via Jenkins Pipeline!"
+}
+
+# AMI Amazon Linux 2023 mais recente
+data "aws_ami" "amazon_linux" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["al2023-ami-*-x86_64"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+
+# VPC Default
 data "aws_vpc" "default" {
   default = true
 }
@@ -46,56 +69,97 @@ data "aws_subnets" "default" {
   }
 }
 
-# Security Group para WebServer
-module "webserver_sg" {
-  source = "../../modules/security-group"
-
-  name        = "webserver"
-  description = "Security group for web server"
+# Security Group
+resource "aws_security_group" "webserver" {
+  name        = "webserver-${var.environment}-sg"
+  description = "Security group for web server demo"
   vpc_id      = data.aws_vpc.default.id
-  environment = var.environment
 
-  ingress_rules = [
-    {
-      description = "HTTP"
-      from_port   = 80
-      to_port     = 80
-      protocol    = "tcp"
-      cidr_blocks = ["0.0.0.0/0"]
-    },
-    {
-      description = "HTTPS"
-      from_port   = 443
-      to_port     = 443
-      protocol    = "tcp"
-      cidr_blocks = ["0.0.0.0/0"]
-    },
-    {
-      description = "SSH"
-      from_port   = 22
-      to_port     = 22
-      protocol    = "tcp"
-      cidr_blocks = [var.ssh_allowed_cidr]
-    }
-  ]
+  ingress {
+    description = "HTTP"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
-  tags = var.tags
+  ingress {
+    description = "SSH"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "webserver-${var.environment}-sg"
+  }
 }
 
-# EC2 WebServer
-module "webserver" {
-  source = "../../modules/ec2"
+# EC2 Instance
+resource "aws_instance" "webserver" {
+  ami                    = data.aws_ami.amazon_linux.id
+  instance_type          = var.instance_type
+  subnet_id              = data.aws_subnets.default.ids[0]
+  vpc_security_group_ids = [aws_security_group.webserver.id]
 
-  name               = "webserver"
-  environment        = var.environment
-  instance_count     = 1
-  instance_type      = var.instance_type
-  key_name           = var.key_name
-  subnet_id          = data.aws_subnets.default.ids[0]
-  security_group_ids = [module.webserver_sg.security_group_id]
+  user_data = <<-EOF
+    #!/bin/bash
+    yum update -y
+    yum install -y httpd
+    systemctl start httpd
+    systemctl enable httpd
+    
+    cat > /var/www/html/index.html <<HTML
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Terraform Demo</title>
+      <style>
+        body { font-family: Arial; text-align: center; padding: 50px; background: #1a1a2e; color: #eee; }
+        .container { background: #16213e; padding: 40px; border-radius: 10px; display: inline-block; }
+        h1 { color: #e94560; }
+        .info { background: #0f3460; padding: 15px; border-radius: 5px; margin: 10px 0; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>🚀 ${var.server_message}</h1>
+        <div class="info"><strong>Instance ID:</strong> $(curl -s http://169.254.169.254/latest/meta-data/instance-id)</div>
+        <div class="info"><strong>Availability Zone:</strong> $(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)</div>
+        <div class="info"><strong>Instance Type:</strong> $(curl -s http://169.254.169.254/latest/meta-data/instance-type)</div>
+        <div class="info"><strong>Deploy Time:</strong> $(date)</div>
+      </div>
+    </body>
+    </html>
+    HTML
+  EOF
 
-  server_colors  = [var.server_color]
-  server_message = var.server_message
+  tags = {
+    Name = "webserver-${var.environment}"
+  }
+}
 
-  tags = var.tags
+# Outputs
+output "instance_id" {
+  value = aws_instance.webserver.id
+}
+
+output "public_ip" {
+  value = aws_instance.webserver.public_ip
+}
+
+output "public_dns" {
+  value = aws_instance.webserver.public_dns
+}
+
+output "webserver_url" {
+  value = "http://${aws_instance.webserver.public_ip}"
 }
