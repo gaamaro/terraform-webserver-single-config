@@ -195,8 +195,6 @@ pipeline {
     }
 
     post {
-        always {
-        }
         success {
             echo "Pipeline executado com sucesso usando imagem customizada!"
         }
