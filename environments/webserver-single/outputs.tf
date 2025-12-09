@@ -2,25 +2,25 @@
 
 output "instance_id" {
   description = "ID of the EC2 instance"
-  value       = module.webserver.instance_ids[0]
+  value       = aws_instance.webserver.id
 }
 
 output "public_ip" {
   description = "Public IP of the EC2 instance"
-  value       = module.webserver.public_ips[0]
+  value       = aws_instance.webserver.public_ip
 }
 
 output "private_ip" {
   description = "Private IP of the EC2 instance"
-  value       = module.webserver.private_ips[0]
+  value       = aws_instance.webserver.private_ip
 }
 
 output "security_group_id" {
   description = "ID of the security group"
-  value       = module.webserver_sg.security_group_id
+  value       = aws_security_group.webserver.id
 }
 
 output "website_url" {
   description = "URL to access the website"
-  value       = "http://${module.webserver.public_ips[0]}"
+  value       = "http://${aws_instance.webserver.public_ip}"
 }

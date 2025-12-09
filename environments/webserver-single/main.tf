@@ -2,7 +2,6 @@
 
 terraform {
   required_version = ">= 1.0"
-
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -13,7 +12,6 @@ terraform {
 
 provider "aws" {
   region = var.aws_region
-
   default_tags {
     tags = {
       Project     = "terraform-demo"
@@ -24,33 +22,14 @@ provider "aws" {
   }
 }
 
-# Variáveis
-variable "aws_region" {
-  default = "us-east-1"
-}
-
-variable "environment" {
-  default = "demo"
-}
-
-variable "instance_type" {
-  default = "t3.micro"
-}
-
-variable "server_message" {
-  default = "Deploy via Jenkins Pipeline!"
-}
-
 # AMI Amazon Linux 2023 mais recente
 data "aws_ami" "amazon_linux" {
   most_recent = true
   owners      = ["amazon"]
-
   filter {
     name   = "name"
     values = ["al2023-ami-*-x86_64"]
   }
-
   filter {
     name   = "virtualization-type"
     values = ["hvm"]
@@ -132,10 +111,10 @@ resource "aws_instance" "webserver" {
     <body>
       <div class="container">
         <h1>🚀 ${var.server_message}</h1>
-        <div class="info"><strong>Instance ID:</strong> $(curl -s http://169.254.169.254/latest/meta-data/instance-id)</div>
-        <div class="info"><strong>Availability Zone:</strong> $(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)</div>
-        <div class="info"><strong>Instance Type:</strong> $(curl -s http://169.254.169.254/latest/meta-data/instance-type)</div>
-        <div class="info"><strong>Deploy Time:</strong> $(date)</div>
+        <div class="info"><strong>Instance ID:</strong> \$(curl -s http://169.254.169.254/latest/meta-data/instance-id)</div>
+        <div class="info"><strong>Availability Zone:</strong> \$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)</div>
+        <div class="info"><strong>Instance Type:</strong> \$(curl -s http://169.254.169.254/latest/meta-data/instance-type)</div>
+        <div class="info"><strong>Deploy Time:</strong> \$(date)</div>
       </div>
     </body>
     </html>
@@ -145,21 +124,4 @@ resource "aws_instance" "webserver" {
   tags = {
     Name = "webserver-${var.environment}"
   }
-}
-
-# Outputs
-output "instance_id" {
-  value = aws_instance.webserver.id
-}
-
-output "public_ip" {
-  value = aws_instance.webserver.public_ip
-}
-
-output "public_dns" {
-  value = aws_instance.webserver.public_dns
-}
-
-output "webserver_url" {
-  value = "http://${aws_instance.webserver.public_ip}"
 }
