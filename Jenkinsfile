@@ -196,7 +196,6 @@ pipeline {
 
     post {
         always {
-            cleanWs()
         }
         success {
             echo "Pipeline executado com sucesso usando imagem customizada!"
